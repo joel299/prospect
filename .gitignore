@@ -1,0 +1,32 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go
+/bin/
+*.test
+/coverage.out
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+.vite/
+
+# Local tooling
+.DS_Store
+.vscode/
+.idea/
+.cache/
+.tmp/
+
+# Runtime data
+*.log
+*.sqlite
+
+# OS
+Thumbs.db
