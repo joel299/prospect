@@ -1,0 +1,62 @@
+openapi: 3.0.3
+info:
+  title: Chat Prospect API
+  version: 0.1.0
+  description: Contract-first conversation API; provider credentials stay server-side.
+servers:
+  - url: http://localhost:8080
+paths:
+  /health:
+    get:
+      operationId: health
+      responses:
+        '200': {description: Healthy}
+  /api/v1/webhooks/ryze:
+    post:
+      operationId: ryzeInbound
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InboundMessage'}
+      responses:
+        '202': {description: Accepted}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /api/v1/conversations/{id}/messages:
+    get:
+      operationId: listMessages
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: Messages}}
+  /api/v1/conversations/{id}/send:
+    post:
+      operationId: sendMessage
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/SendMessage'}}}
+      responses: {'202': {description: Queued}, '422': {$ref: '#/components/responses/ValidationError'}}
+components:
+  schemas:
+    InboundMessage:
+      type: object
+      required: [conversation_id, external_id, content]
+      properties:
+        conversation_id: {type: string}
+        lead_id: {type: string}
+        external_id: {type: string}
+        content: {type: string, minLength: 1}
+    SendMessage:
+      type: object
+      required: [content]
+      properties:
+        lead_id: {type: string}
+        content: {type: string, minLength: 1}
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: object}
+  responses:
+    ValidationError:
+      description: Validation error
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
