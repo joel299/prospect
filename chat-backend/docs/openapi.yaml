@@ -35,6 +35,21 @@ paths:
         required: true
         content: {application/json: {schema: {$ref: '#/components/schemas/SendMessage'}}}
       responses: {'202': {description: Queued}, '422': {$ref: '#/components/responses/ValidationError'}}
+  /api/v1/integrations/trello/sync:
+    post:
+      operationId: trelloSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lead_id]
+              additionalProperties: true
+      responses:
+        '202': {description: Accepted by the Composio/Hermes tool bridge}
+        '422': {$ref: '#/components/responses/ValidationError'}
+        '503': {description: Composio bridge not configured}
 components:
   schemas:
     InboundMessage:

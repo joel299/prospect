@@ -72,11 +72,19 @@ func (s *Service) respond(ctx context.Context, cid, lid string) {
 	}
 	_, _ = s.Send(ctx, domain.OutboundMessage{ConversationID: cid, LeadID: lid, Content: r.Content})
 }
-func (s *Service) Send(_ context.Context, out domain.OutboundMessage) (domain.Message, error) {
-	if strings.TrimSpace(out.Content) == "" || out.ConversationID == "" {
+func (s *Service) Send(ctx context.Context, out domain.OutboundMessage) (domain.Message, error) {
+	if strings.TrimSpace(out.Content) == "" || out.ConversationID == "" || strings.TrimSpace(out.LeadID) == "" {
 		return domain.Message{}, fmt.Errorf("invalid outbound message")
 	}
 	m := domain.Message{ID: hash(out.ConversationID + out.Content + time.Now().String()), ConversationID: out.ConversationID, LeadID: out.LeadID, Provider: "ryze", Direction: "outbound", Content: out.Content, Status: "queued", CreatedAt: time.Now().UTC()}
+	if s.Ryze != nil {
+		externalID, err := s.Ryze.SendText(ctx, out)
+		if err != nil {
+			return domain.Message{}, err
+		}
+		m.ExternalID = externalID
+		m.Status = "accepted"
+	}
 	s.Store.mu.Lock()
 	s.Store.msgs[out.ConversationID] = append(s.Store.msgs[out.ConversationID], m)
 	s.Store.mu.Unlock()

@@ -11,6 +11,15 @@
 
 Status atual: discovery concluído parcialmente; implementação aguardando fechamento das credenciais e decisões de infraestrutura.
 
+## Runtime infrastructure
+
+- PostgreSQL database: `prospect` on the existing Swarm service `postgres_postgres`.
+- Application role: `prospect_app`.
+- Docker secret: `prospect_database_url` (value never committed or printed).
+- PostgreSQL schema migration: `chat-backend/migrations/001_initial.sql`.
+- Realtime API endpoint: `/ws/v1`.
+- Trello/Cal.com operations use the installed Composio CLI through the server-side adapter.
+
 ## 1. Visão geral
 
 Este é um projeto novo.

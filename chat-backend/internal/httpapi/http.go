@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/iainfinito/chat-backend/internal/domain"
+	"github.com/iainfinito/chat-backend/internal/providers/composio"
 	"github.com/iainfinito/chat-backend/internal/realtime"
 	"github.com/iainfinito/chat-backend/internal/service"
 	"net/http"
@@ -11,8 +12,9 @@ import (
 )
 
 type API struct {
-	S *service.Service
-	H *realtime.Hub
+	S     *service.Service
+	H     *realtime.Hub
+	Tools composio.ToolExecutor
 }
 
 func (a API) Handler() http.Handler {
@@ -21,6 +23,7 @@ func (a API) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/webhooks/ryze", a.inbound)
 	m.HandleFunc("GET /api/v1/conversations/{id}/messages", a.messages)
 	m.HandleFunc("POST /api/v1/conversations/{id}/send", a.send)
+	m.HandleFunc("POST /api/v1/integrations/trello/sync", a.trelloSync)
 	m.Handle("/ws/v1", a.H)
 	return requestID(m)
 }
@@ -60,6 +63,28 @@ func (a API) send(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 202, m)
 }
+func (a API) trelloSync(w http.ResponseWriter, r *http.Request) {
+	if a.Tools == nil {
+		problem(w, http.StatusServiceUnavailable, "COMPOSIO_NOT_CONFIGURED", "Composio executor is not configured", nil)
+		return
+	}
+	var payload map[string]any
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&payload) != nil {
+		problem(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid JSON", nil)
+		return
+	}
+	if strings.TrimSpace(fmt.Sprint(payload["lead_id"])) == "" {
+		problem(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "lead_id is required", nil)
+		return
+	}
+	result, err := a.Tools.Execute(r.Context(), "trello_sync_lead", payload)
+	if err != nil {
+		problem(w, http.StatusBadGateway, "COMPOSIO_ERROR", err.Error(), nil)
+		return
+	}
+	write(w, http.StatusAccepted, map[string]any{"status": "accepted", "provider": "composio", "result": result})
+}
+
 func write(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

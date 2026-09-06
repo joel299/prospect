@@ -10,17 +10,43 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
+func envFirst(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func main() {
 	h := realtime.New()
-	llm := omniroute.Client{BaseURL: os.Getenv("OMNIROUTE_BASE_URL"), APIKey: os.Getenv("OMNIROUTE_API_KEY"), Model: os.Getenv("OMNIROUTE_MODEL"), HTTP: &http.Client{Timeout: 30 * time.Second}}
-	s := service.New(ryze.HTTPClient{BaseURL: os.Getenv("RYZE_BASE_URL"), APIKey: os.Getenv("RYZE_API_KEY"), Instance: os.Getenv("RYZE_INSTANCE")}, llm, composio.Client{APIKey: os.Getenv("COMPOSIO_API_KEY")}, h)
+	llm := omniroute.Client{
+		BaseURL: envFirst("OMNIROUTE_BASE_URL", "OMNIROUTER_BASE_URL"),
+		APIKey:  envFirst("OMNIROUTE_API_KEY", "OMNIROUTER_APIKEY"),
+		Model:   envFirst("OMNIROUTE_MODEL", "OMNIROUTER_MODEL"),
+		HTTP:    &http.Client{Timeout: 30 * time.Second},
+	}
+	ryzeBaseURL := envFirst("RYZE_BASE_URL", "RYZE_API_BASE_URL")
+	if ryzeBaseURL == "" {
+		ryzeBaseURL = "https://ryzeapi.cloud"
+	}
+	ryzeClient := ryze.HTTPClient{
+		BaseURL:  ryzeBaseURL,
+		APIKey:   envFirst("RYZE_API_KEY", "RAYZE_APIKEY", "Token_Instance"),
+		Instance: envFirst("RYZE_INSTANCE", "Instance_Name"),
+		HTTP:     &http.Client{Timeout: 30 * time.Second},
+	}
+	composioClient := composio.Client{BaseURL: envFirst("COMPOSIO_BASE_URL"), APIKey: envFirst("COMPOSIO_API_KEY")}
+	s := service.New(ryzeClient, llm, composioClient, h)
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 	log.Printf("chat-backend listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, httpapi.API{S: s, H: h}.Handler()))
+	log.Fatal(http.ListenAndServe(addr, httpapi.API{S: s, H: h, Tools: composioClient}.Handler()))
 }
