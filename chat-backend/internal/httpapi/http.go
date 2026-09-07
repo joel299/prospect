@@ -90,11 +90,12 @@ func (a API) agentTest(w http.ResponseWriter, r *http.Request) {
 	write(w, http.StatusOK, map[string]any{"content": response.Content, "tool_calls": response.ToolCalls})
 }
 func (a API) inbound(w http.ResponseWriter, r *http.Request) {
-	var in domain.InboundMessage
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&in) != nil {
+	var raw map[string]any
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&raw) != nil {
 		problem(w, 422, "VALIDATION_ERROR", "invalid JSON", nil)
 		return
 	}
+	in := normalizeRyzeInbound(raw)
 	m, e := a.S.Inbound(r.Context(), in)
 	if e == service.ErrDuplicate {
 		write(w, 200, map[string]any{"duplicate": true})
@@ -106,6 +107,37 @@ func (a API) inbound(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 202, m)
 }
+
+func normalizeRyzeInbound(raw map[string]any) domain.InboundMessage {
+	in := domain.InboundMessage{ConversationID: stringValue(raw["conversation_id"]), LeadID: stringValue(raw["lead_id"]), ExternalID: stringValue(raw["external_id"]), Content: stringValue(raw["content"]), FromMe: boolValue(raw["fromMe"]) || boolValue(raw["isFromMe"])}
+	msg, _ := raw["message"].(map[string]any)
+	if msg != nil {
+		in.ExternalID = firstNonEmpty(stringValue(msg["id"]), stringValue(raw["id"]), in.ExternalID)
+		in.FromMe = in.FromMe || boolValue(msg["fromMe"]) || boolValue(msg["isFromMe"]) || strings.EqualFold(stringValue(msg["direction"]), "outgoing")
+		chat, _ := msg["chat"].(map[string]any)
+		phone := firstNonEmpty(stringValue(chat["jid"]), stringValue(msg["sender"]))
+		phone = strings.Split(phone, "@")[0]
+		in.LeadID = firstNonEmpty(in.LeadID, phone)
+		in.ConversationID = firstNonEmpty(in.ConversationID, "ryze:"+phone)
+		content, _ := msg["content"].(map[string]any)
+		in.Content = firstNonEmpty(in.Content, stringValue(content["text"]))
+	}
+	if in.ConversationID == "" {
+		in.ConversationID = "ryze:" + in.LeadID
+	}
+	return in
+}
+func stringValue(v any) string { s, _ := v.(string); return strings.TrimSpace(s) }
+func boolValue(v any) bool     { b, _ := v.(bool); return b }
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func (a API) messages(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]any{"messages": a.S.Messages(r.PathValue("id"))})
 }

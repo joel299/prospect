@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"github.com/iainfinito/chat-backend/internal/domain"
 	"github.com/iainfinito/chat-backend/internal/httpapi"
 	"github.com/iainfinito/chat-backend/internal/providers/buffer"
 	"github.com/iainfinito/chat-backend/internal/providers/composio"
@@ -76,6 +78,20 @@ func main() {
 	api := httpapi.API{S: s, H: h, Tools: composioClient}
 	if bufferConsumer != nil {
 		api.Buffer = *bufferConsumer
+	}
+	ryzeToken := envFirst("RYZE_API_KEY", "RAYZE_APIKEY", "Token_Instance")
+	ryzeInstance := envFirst("RYZE_INSTANCE", "Instance_Name")
+	if ryzeToken != "" && ryzeInstance != "" {
+		listener := ryze.EventListener{BaseURL: ryzeBaseURL, APIKey: ryzeToken, Instance: ryzeInstance, HTTP: &http.Client{Timeout: 15 * time.Second}}
+		go func() {
+			if err := listener.Configure(context.Background()); err != nil {
+				log.Printf("ryze websocket configure failed: %v", err)
+				return
+			}
+			if err := listener.Listen(context.Background(), func(in domain.InboundMessage) { _, _ = s.Inbound(context.Background(), in) }); err != nil {
+				log.Printf("ryze websocket stopped: %v", err)
+			}
+		}()
 	}
 	log.Fatal(http.ListenAndServe(addr, api.Handler()))
 }

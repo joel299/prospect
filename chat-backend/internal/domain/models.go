@@ -28,6 +28,7 @@ type InboundMessage struct {
 	LeadID         string `json:"lead_id"`
 	ExternalID     string `json:"external_id"`
 	Content        string `json:"content"`
+	FromMe         bool   `json:"fromMe"`
 }
 type OutboundMessage struct{ ConversationID, LeadID, Content string }
 type ToolCall struct {

@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/iainfinito/chat-backend/internal/domain"
 )
@@ -18,10 +21,19 @@ type Client interface {
 }
 
 type HTTPClient struct {
-	BaseURL  string
-	APIKey   string
-	Instance string
-	HTTP     *http.Client
+	BaseURL     string
+	APIKey      string
+	Instance    string
+	HTTP        *http.Client
+	MinInterval time.Duration
+	limiter     *requestLimiter
+}
+
+var defaultLimiter requestLimiter
+
+type requestLimiter struct {
+	mu          sync.Mutex
+	lastRequest time.Time
 }
 
 func (c HTTPClient) client() *http.Client {
@@ -39,6 +51,7 @@ func (c HTTPClient) endpoint(path string) (string, error) {
 }
 
 func (c HTTPClient) do(ctx context.Context, method, url string, body any, out any) error {
+	c.waitTurn(ctx)
 	var r io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -58,6 +71,24 @@ func (c HTTPClient) do(ctx context.Context, method, url string, body any, out an
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusTooManyRequests {
+		delay := parseRetryAfter(resp.Header.Get("Retry-After"), resp.Header.Get("X-RateLimit-Reset"))
+		if delay <= 0 {
+			delay = 2 * time.Second
+		}
+		if delay > 30*time.Second {
+			delay = 30 * time.Second
+		}
+		_ = resp.Body.Close()
+		t := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return ctx.Err()
+		case <-t.C:
+		}
+		return c.do(ctx, method, url, body, out)
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		return fmt.Errorf("ryze status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
@@ -133,4 +164,39 @@ func parseHistory(raw any) []domain.Message {
 		out = append(out, domain.Message{Provider: "ryze", ExternalID: id, Direction: direction, Content: content, Status: "received"})
 	}
 	return out
+}
+
+func (c HTTPClient) waitTurn(ctx context.Context) {
+	interval := c.MinInterval
+	if interval <= 0 {
+		interval = 500 * time.Millisecond
+	}
+	limiter := c.limiter
+	if limiter == nil {
+		limiter = &defaultLimiter
+	}
+	limiter.mu.Lock()
+	wait := time.Until(limiter.lastRequest.Add(interval))
+	limiter.lastRequest = time.Now()
+	limiter.mu.Unlock()
+	if wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+		}
+	}
+}
+
+func parseRetryAfter(retry, reset string) time.Duration {
+	if n, err := strconv.Atoi(strings.TrimSpace(retry)); err == nil && n >= 0 {
+		return time.Duration(n) * time.Second
+	}
+	if n, err := strconv.ParseInt(strings.TrimSpace(reset), 10, 64); err == nil {
+		if d := time.Until(time.Unix(n, 0)); d > 0 {
+			return d
+		}
+	}
+	return 0
 }
