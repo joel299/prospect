@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  frontend:
+    image: prospect-frontend:latest
+    networks:
+      - network_public
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=network_public
+        - traefik.http.routers.prospect-frontend.rule=Host(`chat-prospect.iainfinito.com.br`)
+        - traefik.http.routers.prospect-frontend.entrypoints=websecure
+        - traefik.http.routers.prospect-frontend.tls=true
+        - traefik.http.routers.prospect-frontend.tls.certresolver=letsencryptresolver
+        - traefik.http.services.prospect-frontend.loadbalancer.server.port=80
+
+networks:
+  network_public:
+    external: true
+    name: network_public
