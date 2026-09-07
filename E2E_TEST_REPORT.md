@@ -53,6 +53,9 @@
 - Provider/model used for health probe: `antigravity/gemini-3.6-flash-low`.
 - Root cause of previous timeout: default `auto` route attempted unavailable/ambiguous candidates; logs showed empty pools and abandoned upstream selection. Explicit connected model responds normally.
 - API key setup intentionally not changed or recorded.
+- Configured/tested `antigravity/gemini-3.8-flash-low`: upstream returned HTTP 404 `model_not_found`; it is not currently available through the connected Antigravity account.
+- Known working probe model remains `antigravity/gemini-3.6-flash-low`.
+- OmniRoute skill routes exist, but are management/authenticated APIs: `/api/skills`, `/api/skills/install`, and `/api/skills/executions`. They are not exposed as unauthenticated `/v1` model tools.
 
 ## Remaining gates
 
