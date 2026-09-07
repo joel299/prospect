@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   api:
-    image: prospect/chat-api:542acf9
+    image: prospect/chat-api:e2321ac2
     environment:
       HTTP_ADDR: ":8080"
       OMNIROUTE_BASE_URL: "https://omnirouter.iainfinito.com.br"
