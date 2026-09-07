@@ -12,7 +12,7 @@ curl http://localhost:8080/health
 
 No provider credentials are bundled. Ryze, OmniRoute, Buffer, and Composio are dependency-injected adapters and remain explicitly unconfigured until environment values and provider endpoint mappings are supplied. The API never sends secrets to OmniRoute; only conversation context is passed.
 
-The agent prompt is assembled at runtime: `lead_id`/state come from `LEAD_API_URL`, recent messages and the latest inbound message come from `BUFFER_HISTORY_URL`, and `prompt_cache` contains only stable non-secret instructions. Both URLs are full deployment-configured endpoints; the code deliberately does not guess provider paths.
+The agent prompt is assembled at runtime: `lead_id` and state come from the `prospect_leads_google` table in Supabase, recent messages and the latest inbound message come from `BUFFER_HISTORY_URL`, and `prompt_cache` contains only stable non-secret instructions. The backend uses the Supabase server credential only; it is never exposed to the frontend or OmniRoute.
 
 ## API
 

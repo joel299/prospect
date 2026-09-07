@@ -55,7 +55,7 @@ func main() {
 	s := service.New(ryzeClient, llm, composioClient, h)
 	if historyURL := envFirst("BUFFER_HISTORY_URL"); historyURL != "" {
 		s.SetContextProviders(
-			lead.Client{URL: envFirst("LEAD_API_URL"), Token: envFirst("LEAD_API_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}},
+			lead.SupabaseClient{BaseURL: envFirst("SUPABASE_URL"), APIKey: envFirst("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY"), Table: envFirst("SUPABASE_LEADS_TABLE"), HTTP: &http.Client{Timeout: 10 * time.Second}},
 			buffer.HistoryClient{HistoryURL: historyURL, AccessToken: envFirst("BUFFER_ACCESS_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}},
 		)
 	}
