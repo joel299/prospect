@@ -1,0 +1,65 @@
+http:
+  routers:
+    api-debounce:
+      rule: Host(`api-debounce.iainfinito.com.br`)
+      entryPoints: [websecure]
+      service: legacy-traefik
+      tls:
+        certResolver: letsencryptresolver
+    teste-pedistore:
+      rule: Host(`teste.pedistore.com.br`)
+      entryPoints: [websecure]
+      service: legacy-traefik
+      tls:
+        certResolver: letsencryptresolver
+    api-finance:
+      rule: Host(`api-finance.iainfinito.com.br`) && (PathPrefix(`/docs`) || PathPrefix(`/api`) || PathPrefix(`/api-json`))
+      entryPoints: [websecure]
+      service: finance-api
+      tls:
+        certResolver: letsencryptresolver
+    api-finance-root:
+      rule: Host(`api-finance.iainfinito.com.br`)
+      entryPoints: [websecure]
+      middlewares: [api-finance-docs]
+      service: finance-api
+      tls:
+        certResolver: letsencryptresolver
+    finance-api:
+      rule: Host(`finance.iainfinito.com.br`) && (PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/api-json`))
+      entryPoints: [websecure]
+      service: finance-api
+      tls:
+        certResolver: letsencryptresolver
+    finance-web:
+      rule: Host(`finance.iainfinito.com.br`)
+      entryPoints: [websecure]
+      service: finance-web
+      tls:
+        certResolver: letsencryptresolver
+  middlewares:
+    api-finance-docs:
+      redirectRegex:
+        regex: "^https?://api-finance\\.iainfinito\\.com\\.br/?$"
+        replacement: "https://api-finance.iainfinito.com.br/docs"
+        permanent: false
+  services:
+    legacy-traefik:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: legacy-traefik-insecure
+        servers:
+          - url: https://host.docker.internal:8443
+    finance-api:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://host.docker.internal:3000
+    finance-web:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://host.docker.internal:3100
+  serversTransports:
+    legacy-traefik-insecure:
+      insecureSkipVerify: true
