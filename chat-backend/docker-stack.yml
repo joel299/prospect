@@ -21,20 +21,17 @@ services:
       labels:
         - traefik.enable=true
         - traefik.docker.network=network_public
-        - traefik.http.routers.prospect-api-web.rule=Host(`216.22.13.46`)
-        - traefik.http.routers.prospect-api-web.entrypoints=web
-        - traefik.http.routers.prospect-api-web.middlewares=prospect-api-redirect
-        - traefik.http.routers.prospect-api-web.service=prospect-api
-        - traefik.http.routers.prospect-api-secure.rule=Host(`216.22.13.46`)
-        - traefik.http.routers.prospect-api-secure.entrypoints=websecure
-        - traefik.http.routers.prospect-api-secure.tls=true
-        - traefik.http.routers.prospect-api-secure.service=prospect-api
-        - traefik.http.middlewares.prospect-api-redirect.redirectscheme.scheme=https
+        - traefik.http.routers.prospect-api.rule=Host(`chat-api.iainfinito.com.br`)
+        - traefik.http.routers.prospect-api.entrypoints=websecure
+        - traefik.http.routers.prospect-api.tls=true
+        - traefik.http.routers.prospect-api.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.prospect-api.service=prospect-api
         - traefik.http.services.prospect-api.loadbalancer.server.port=8080
 
 secrets:
   prospect_omniroute_api_key:
     external: true
+    name: omniroute_api_key
 
 networks:
   network_public:
