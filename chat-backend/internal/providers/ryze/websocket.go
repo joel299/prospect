@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -44,6 +45,7 @@ func (l EventListener) Configure(ctx context.Context) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("ryze websocket config status %d", resp.StatusCode)
 	}
+	log.Printf("ryze websocket configured instance=%s", l.Instance)
 	return nil
 }
 
@@ -63,12 +65,16 @@ func (l EventListener) Listen(ctx context.Context, onMessage func(domain.Inbound
 		}
 		conn, _, err := dialer.DialContext(ctx, u, nil)
 		if err == nil {
+			log.Printf("ryze websocket connected instance=%s", l.Instance)
 			backoff = time.Second
 			err = l.read(ctx, conn, onMessage)
 			_ = conn.Close()
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
+			log.Printf("ryze websocket read stopped: %v", err)
+		} else {
+			log.Printf("ryze websocket dial failed: %v", err)
 		}
 		jitter := time.Duration(rand.Int63n(int64(backoff/2 + 1)))
 		wait := backoff + jitter
@@ -150,6 +156,7 @@ func (l EventListener) read(ctx context.Context, conn *websocket.Conn, onMessage
 		if content == "" || id == "" {
 			continue
 		}
+		log.Printf("ryze websocket event id=%s lead=%s fromMe=%t", id, phone, fromMe)
 		onMessage(domain.InboundMessage{ConversationID: "ryze:" + phone, LeadID: phone, ExternalID: id, Content: content, FromMe: fromMe})
 		_ = ctx
 	}
