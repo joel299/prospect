@@ -53,10 +53,15 @@ func main() {
 	}
 	composioClient := composio.Client{BaseURL: envFirst("COMPOSIO_BASE_URL"), APIKey: envFirst("COMPOSIO_API_KEY", "COMPOSIO_APIKEY")}
 	s := service.New(ryzeClient, llm, composioClient, h)
+	var bufferConsumer *buffer.Consumer
+	if base := envFirst("BUFFER_BASE_URL"); base != "" {
+		c := buffer.Consumer{BaseURL: base, AccessToken: envFirst("BUFFER_API_KEY", "BUFFER_ACCESS_TOKEN"), TenantID: envFirst("BUFFER_TENANT_ID"), ConsumerID: envFirst("BUFFER_CONSUMER_ID"), HTTP: &http.Client{Timeout: 15 * time.Second}}
+		bufferConsumer = &c
+	}
 	if envFirst("SUPABASE_URL") != "" {
 		var historyProvider service.BufferHistoryProvider
-		if historyURL := envFirst("BUFFER_HISTORY_URL"); historyURL != "" {
-			historyProvider = buffer.HistoryClient{HistoryURL: historyURL, AccessToken: envFirst("BUFFER_ACCESS_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}}
+		if bufferConsumer != nil {
+			historyProvider = *bufferConsumer
 		}
 		s.SetContextProviders(
 			lead.SupabaseClient{BaseURL: envFirst("SUPABASE_URL"), APIKey: envFirst("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY"), Table: envFirst("SUPABASE_LEADS_TABLE"), HTTP: &http.Client{Timeout: 10 * time.Second}},
@@ -68,5 +73,9 @@ func main() {
 		addr = ":8080"
 	}
 	log.Printf("chat-backend listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, httpapi.API{S: s, H: h, Tools: composioClient}.Handler()))
+	api := httpapi.API{S: s, H: h, Tools: composioClient}
+	if bufferConsumer != nil {
+		api.Buffer = *bufferConsumer
+	}
+	log.Fatal(http.ListenAndServe(addr, api.Handler()))
 }

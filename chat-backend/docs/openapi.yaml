@@ -34,6 +34,15 @@ paths:
         '200': {description: OmniRoute response; no Ryze message is sent}
         '422': {$ref: '#/components/responses/ValidationError'}
         '502': {description: OmniRoute provider error}
+  /api/v1/buffer/consume:
+    post:
+      operationId: consumeBuffer
+      summary: Consume the next ready message buffer
+      description: Reserves the next ready buffer from api-debounce using the server-side Buffer token and returns its real messages for prompt construction.
+      responses:
+        '200': {description: Buffer found or queue empty}
+        '503': {description: Buffer integration not configured}
+        '502': {description: Buffer provider error}
   /api/v1/conversations:
     get:
       operationId: listConversations

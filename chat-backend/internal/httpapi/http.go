@@ -1,10 +1,12 @@
 package httpapi
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"github.com/iainfinito/chat-backend/internal/domain"
+	"github.com/iainfinito/chat-backend/internal/providers/buffer"
 	"github.com/iainfinito/chat-backend/internal/providers/composio"
 	"github.com/iainfinito/chat-backend/internal/realtime"
 	"github.com/iainfinito/chat-backend/internal/service"
@@ -13,9 +15,12 @@ import (
 )
 
 type API struct {
-	S     *service.Service
-	H     *realtime.Hub
-	Tools composio.ToolExecutor
+	S      *service.Service
+	H      *realtime.Hub
+	Tools  composio.ToolExecutor
+	Buffer interface {
+		ConsumeNext(context.Context) (buffer.Consumed, error)
+	}
 }
 
 //go:embed openapi.yaml
@@ -32,10 +37,24 @@ func (a API) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/conversations/{id}/send", a.send)
 	m.HandleFunc("POST /api/v1/integrations/trello/sync", a.trelloSync)
 	m.HandleFunc("POST /api/v1/test/agent", a.agentTest)
+	m.HandleFunc("POST /api/v1/buffer/consume", a.consumeBuffer)
 	m.HandleFunc("POST /api/v1/agent/test", a.agentTest)
 	m.Handle("/ws/v1", a.H)
 	return cors(requestID(m))
 }
+func (a API) consumeBuffer(w http.ResponseWriter, r *http.Request) {
+	if a.Buffer == nil {
+		problem(w, http.StatusServiceUnavailable, "BUFFER_NOT_CONFIGURED", "Buffer consumer is not configured", nil)
+		return
+	}
+	result, err := a.Buffer.ConsumeNext(r.Context())
+	if err != nil {
+		problem(w, http.StatusBadGateway, "BUFFER_ERROR", err.Error(), nil)
+		return
+	}
+	write(w, http.StatusOK, result)
+}
+
 func (a API) health(w http.ResponseWriter, _ *http.Request) {
 	write(w, 200, map[string]string{"status": "ok", "service": "chat-backend"})
 }
