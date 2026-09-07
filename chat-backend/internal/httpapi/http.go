@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"github.com/iainfinito/chat-backend/internal/domain"
@@ -17,18 +18,56 @@ type API struct {
 	Tools composio.ToolExecutor
 }
 
+//go:embed openapi.yaml
+var openAPISpec []byte
+
 func (a API) Handler() http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /health", a.health)
+	m.HandleFunc("GET /openapi.yaml", a.openapi)
+	m.HandleFunc("GET /docs", a.scalar)
 	m.HandleFunc("POST /api/v1/webhooks/ryze", a.inbound)
 	m.HandleFunc("GET /api/v1/conversations/{id}/messages", a.messages)
 	m.HandleFunc("POST /api/v1/conversations/{id}/send", a.send)
 	m.HandleFunc("POST /api/v1/integrations/trello/sync", a.trelloSync)
+	m.HandleFunc("POST /api/v1/test/agent", a.agentTest)
+	m.HandleFunc("POST /api/v1/agent/test", a.agentTest)
 	m.Handle("/ws/v1", a.H)
 	return requestID(m)
 }
 func (a API) health(w http.ResponseWriter, _ *http.Request) {
 	write(w, 200, map[string]string{"status": "ok", "service": "chat-backend"})
+}
+func (a API) openapi(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(openAPISpec)
+}
+func (a API) scalar(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = fmt.Fprintf(w, `<!doctype html><html><head><title>Chat Prospect API</title></head><body><script id="api-reference" data-url="%s/openapi.yaml"></script><script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script></body></html>`, strings.TrimRight(publicBaseURL(r), "/"))
+}
+func publicBaseURL(r *http.Request) string {
+	if scheme := r.Header.Get("X-Forwarded-Proto"); scheme != "" {
+		return scheme + "://" + r.Host
+	}
+	return "http://" + r.Host
+}
+func (a API) agentTest(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Message string `json:"message"`
+		System  string `json:"system,omitempty"`
+	}
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&payload) != nil {
+		problem(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid JSON", nil)
+		return
+	}
+	response, err := a.S.TestAgent(r.Context(), domain.AgentRequest{System: payload.System, User: payload.Message})
+	if err != nil {
+		problem(w, http.StatusBadGateway, "OMNIROUTE_ERROR", err.Error(), nil)
+		return
+	}
+	write(w, http.StatusOK, map[string]any{"content": response.Content, "tool_calls": response.ToolCalls})
 }
 func (a API) inbound(w http.ResponseWriter, r *http.Request) {
 	var in domain.InboundMessage

@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   frontend:
-    image: prospect-frontend:latest
+    image: prospect-frontend:47-v1
     networks:
       - network_public
     deploy:

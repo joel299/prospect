@@ -4,8 +4,8 @@ info:
   version: 0.1.0
   description: Contract-first conversation API; provider credentials stay server-side.
 servers:
-  - url: http://216.22.13.46
-    description: Public API test endpoint
+  - url: https://chat-api.iainfinito.com.br
+    description: Public API
   - url: http://localhost:8080
     description: Local development
 paths:

@@ -6,7 +6,7 @@ Preencher durante o discovery.
 - Diretório local: `/root/prospect`
 - API hosting: mesma infraestrutura Swarm
 - Frontend hosting:
-- Domain: https://chat-prospect.iainfinito.com.br https://chat-prospect.iainfinito.com.br
+- Domain:
 - PostgreSQL/Supabase: projeto `fsdszcfkjeavuoinyjas` via conexão Composio `supabase_stonen-lapper`
 - PostgreSQL local da aplicação: database `prospect` no serviço `postgres_postgres`
 - Role da aplicação: `prospect_app`
@@ -102,5 +102,5 @@ Preencher durante o discovery.
 
 ## Frontend
 - Framework:
-- Domain: https://chat-prospect.iainfinito.com.br https://chat-prospect.iainfinito.com.br
+- Domain:
 - Auth:

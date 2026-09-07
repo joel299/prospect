@@ -37,6 +37,21 @@ type Service struct {
 func New(r ryze.Client, llm Generator, t composio.ToolExecutor, h *realtime.Hub) *Service {
 	return &Service{Store: &Store{conv: map[string]domain.Conversation{}, msgs: map[string][]domain.Message{}, idem: map[string]string{}}, Ryze: r, LLM: llm, Tools: t, Hub: h}
 }
+
+// TestAgent exercises the configured LLM without sending an outbound message.
+func (s *Service) TestAgent(ctx context.Context, req domain.AgentRequest) (domain.AgentResponse, error) {
+	if s.LLM == nil {
+		return domain.AgentResponse{}, fmt.Errorf("omniroute is not configured")
+	}
+	if strings.TrimSpace(req.User) == "" {
+		return domain.AgentResponse{}, fmt.Errorf("message is required")
+	}
+	if strings.TrimSpace(req.System) == "" {
+		req.System = "Você é um agente de teste. Responda de forma curta e objetiva."
+	}
+	return s.LLM.Generate(ctx, req)
+}
+
 func (s *Service) Inbound(ctx context.Context, in domain.InboundMessage) (domain.Message, error) {
 	if strings.TrimSpace(in.Content) == "" || in.ConversationID == "" || in.ExternalID == "" {
 		return domain.Message{}, fmt.Errorf("invalid inbound message")
