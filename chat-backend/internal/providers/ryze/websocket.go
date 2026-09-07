@@ -106,7 +106,12 @@ func (l EventListener) read(ctx context.Context, conn *websocket.Conn, onMessage
 			Event string          `json:"event"`
 			Data  json.RawMessage `json:"data"`
 		}
-		if json.Unmarshal(raw, &envelope) != nil || envelope.Event != "message.exchange" {
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			log.Printf("ryze websocket invalid frame bytes=%d", len(raw))
+			continue
+		}
+		log.Printf("ryze websocket frame event=%s bytes=%d", envelope.Event, len(raw))
+		if envelope.Event != "message.exchange" {
 			continue
 		}
 		var data struct {
