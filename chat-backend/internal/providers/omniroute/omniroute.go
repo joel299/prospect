@@ -22,7 +22,21 @@ func (c Client) Generate(ctx context.Context, r domain.AgentRequest) (domain.Age
 	if strings.TrimSpace(c.BaseURL) == "" {
 		return domain.AgentResponse{}, fmt.Errorf("omniroute not configured")
 	}
-	b, _ := json.Marshal(map[string]any{"model": c.Model, "system": r.System, "user": r.User, "history": r.History, "tools": r.Tools})
+	messages := make([]map[string]string, 0, len(r.History)+2)
+	if strings.TrimSpace(r.System) != "" {
+		messages = append(messages, map[string]string{"role": "system", "content": r.System})
+	}
+	for _, item := range r.History {
+		role := "user"
+		if item.Direction == "outbound" {
+			role = "assistant"
+		}
+		messages = append(messages, map[string]string{"role": role, "content": item.Content})
+	}
+	if len(messages) == 0 || messages[len(messages)-1]["content"] != r.User {
+		messages = append(messages, map[string]string{"role": "user", "content": r.User})
+	}
+	b, _ := json.Marshal(map[string]any{"model": c.Model, "messages": messages, "tools": r.Tools, "stream": false})
 	req, e := http.NewRequestWithContext(ctx, http.MethodPost, endpoint(c.BaseURL), bytes.NewReader(b))
 	if e != nil {
 		return domain.AgentResponse{}, e

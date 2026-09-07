@@ -24,11 +24,29 @@ func (a API) Handler() http.Handler {
 	m.HandleFunc("GET /api/v1/conversations/{id}/messages", a.messages)
 	m.HandleFunc("POST /api/v1/conversations/{id}/send", a.send)
 	m.HandleFunc("POST /api/v1/integrations/trello/sync", a.trelloSync)
+	m.HandleFunc("POST /api/v1/test/agent", a.agentTest)
+	m.HandleFunc("POST /api/v1/agent/test", a.agentTest)
 	m.Handle("/ws/v1", a.H)
 	return requestID(m)
 }
 func (a API) health(w http.ResponseWriter, _ *http.Request) {
 	write(w, 200, map[string]string{"status": "ok", "service": "chat-backend"})
+}
+func (a API) agentTest(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Message string `json:"message"`
+		System  string `json:"system,omitempty"`
+	}
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&payload) != nil {
+		problem(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid JSON", nil)
+		return
+	}
+	response, err := a.S.TestAgent(r.Context(), domain.AgentRequest{System: payload.System, User: payload.Message})
+	if err != nil {
+		problem(w, http.StatusBadGateway, "OMNIROUTE_ERROR", err.Error(), nil)
+		return
+	}
+	write(w, http.StatusOK, map[string]any{"content": response.Content, "tool_calls": response.ToolCalls})
 }
 func (a API) inbound(w http.ResponseWriter, r *http.Request) {
 	var in domain.InboundMessage
