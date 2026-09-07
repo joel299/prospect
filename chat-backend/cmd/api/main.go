@@ -88,7 +88,18 @@ func main() {
 				log.Printf("ryze websocket configure failed: %v", err)
 				return
 			}
-			if err := listener.Listen(context.Background(), func(in domain.InboundMessage) { _, _ = s.Inbound(context.Background(), in) }); err != nil {
+			if err := listener.Listen(context.Background(), func(in domain.InboundMessage) {
+				if in.FromMe {
+					return
+				}
+				if bufferConsumer != nil {
+					if err := bufferConsumer.Publish(context.Background(), in); err != nil {
+						log.Printf("buffer publish failed: %v", err)
+						return
+					}
+				}
+				_, _ = s.Inbound(context.Background(), in)
+			}); err != nil {
 				log.Printf("ryze websocket stopped: %v", err)
 			}
 		}()

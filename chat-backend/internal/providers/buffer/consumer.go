@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/iainfinito/chat-backend/internal/domain"
 )
@@ -29,6 +30,42 @@ type Consumed struct {
 type Consumer struct {
 	BaseURL, AccessToken, TenantID, ConsumerID string
 	HTTP                                       *http.Client
+}
+
+func (c Consumer) Publish(ctx context.Context, in domain.InboundMessage) error {
+	if strings.TrimSpace(c.BaseURL) == "" || strings.TrimSpace(c.AccessToken) == "" || strings.TrimSpace(c.TenantID) == "" {
+		return fmt.Errorf("buffer publisher not configured")
+	}
+	body, err := json.Marshal(map[string]any{
+		"tenant_id":  c.TenantID,
+		"channel":    "whatsapp",
+		"phone":      in.LeadID,
+		"message_id": in.ExternalID,
+		"content":    in.Content,
+		"timestamp":  time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(c.BaseURL, "/")+"/api/message-buffer/messages", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
+	h := c.HTTP
+	if h == nil {
+		h = http.DefaultClient
+	}
+	resp, err := h.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("buffer publish status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func (c Consumer) ConsumeNext(ctx context.Context) (Consumed, error) {
