@@ -5,13 +5,15 @@ info:
   description: Contract-first conversation API; provider credentials stay server-side.
 servers:
   - url: https://chat-api.iainfinito.com.br
-    description: Public API
+    description: Public production API
   - url: http://localhost:8080
     description: Local development
 paths:
   /health:
     get:
       operationId: health
+      summary: Check API liveness
+      description: Confirms the chat backend process is accepting HTTP requests.
       responses:
         '200': {description: Healthy}
   /api/v1/test/agent:
@@ -29,35 +31,51 @@ paths:
                 message: {type: string, minLength: 1}
                 system: {type: string}
       responses:
-        '200': {description: OmniRoute response}
+        '200': {description: OmniRoute response; no Ryze message is sent}
+        '422': {$ref: '#/components/responses/ValidationError'}
         '502': {description: OmniRoute provider error}
+  /api/v1/conversations:
+    get:
+      operationId: listConversations
+      summary: List conversations
+      description: Lists conversations accepted from Ryze webhooks by the running API process.
+      responses:
+        '200': {description: Conversation list}
   /api/v1/webhooks/ryze:
     post:
       operationId: ryzeInbound
+      summary: Receive an inbound Ryze message
+      description: Validates and deduplicates an inbound message, publishes a realtime event, and starts asynchronous agent processing.
       requestBody:
         required: true
         content:
           application/json:
             schema: {$ref: '#/components/schemas/InboundMessage'}
       responses:
-        '202': {description: Accepted}
+        '202': {description: Accepted; agent processing runs asynchronously}
         '422': {$ref: '#/components/responses/ValidationError'}
   /api/v1/conversations/{id}/messages:
     get:
       operationId: listMessages
+      summary: List conversation messages
+      description: Returns messages held for one conversation in the running API process.
       parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      responses: {'200': {description: Messages}}
+      responses: {'200': {description: Messages for the conversation}}
   /api/v1/conversations/{id}/send:
     post:
       operationId: sendMessage
+      summary: Send an outbound Ryze message
+      description: Sends a message through the server-side Ryze adapter and records the accepted result.
       parameters: [{name: id, in: path, required: true, schema: {type: string}}]
       requestBody:
         required: true
         content: {application/json: {schema: {$ref: '#/components/schemas/SendMessage'}}}
-      responses: {'202': {description: Queued}, '422': {$ref: '#/components/responses/ValidationError'}}
+      responses: {'202': {description: Sent through Ryze}, '422': {$ref: '#/components/responses/ValidationError'}}
   /api/v1/integrations/trello/sync:
     post:
       operationId: trelloSync
+      summary: Synchronize a lead to Trello
+      description: Requests the server-side Composio CLI bridge to resolve or create the lead card without exposing credentials.
       requestBody:
         required: true
         content:

@@ -27,13 +27,14 @@ func (a API) Handler() http.Handler {
 	m.HandleFunc("GET /openapi.yaml", a.openapi)
 	m.HandleFunc("GET /docs", a.scalar)
 	m.HandleFunc("POST /api/v1/webhooks/ryze", a.inbound)
+	m.HandleFunc("GET /api/v1/conversations", a.conversations)
 	m.HandleFunc("GET /api/v1/conversations/{id}/messages", a.messages)
 	m.HandleFunc("POST /api/v1/conversations/{id}/send", a.send)
 	m.HandleFunc("POST /api/v1/integrations/trello/sync", a.trelloSync)
 	m.HandleFunc("POST /api/v1/test/agent", a.agentTest)
 	m.HandleFunc("POST /api/v1/agent/test", a.agentTest)
 	m.Handle("/ws/v1", a.H)
-	return requestID(m)
+	return cors(requestID(m))
 }
 func (a API) health(w http.ResponseWriter, _ *http.Request) {
 	write(w, 200, map[string]string{"status": "ok", "service": "chat-backend"})
@@ -89,8 +90,14 @@ func (a API) inbound(w http.ResponseWriter, r *http.Request) {
 func (a API) messages(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]any{"messages": a.S.Messages(r.PathValue("id"))})
 }
+func (a API) conversations(w http.ResponseWriter, _ *http.Request) {
+	write(w, 200, map[string]any{"conversations": a.S.Conversations()})
+}
 func (a API) send(w http.ResponseWriter, r *http.Request) {
-	var in struct{ LeadID, Content string }
+	var in struct {
+		LeadID  string `json:"lead_id"`
+		Content string `json:"content"`
+	}
 	if json.NewDecoder(r.Body).Decode(&in) != nil {
 		problem(w, 422, "VALIDATION_ERROR", "invalid JSON", nil)
 		return
@@ -131,6 +138,22 @@ func write(w http.ResponseWriter, status int, v any) {
 }
 func problem(w http.ResponseWriter, status int, code, msg string, details any) {
 	write(w, status, map[string]any{"error": map[string]any{"code": code, "message": msg, "details": details}})
+}
+func cors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "https://chat-prospect.iainfinito.com.br" || origin == "http://localhost:5173" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 func requestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -62,6 +62,9 @@ func (s *Service) Inbound(ctx context.Context, in domain.InboundMessage) (domain
 		return domain.Message{}, ErrDuplicate
 	}
 	now := time.Now().UTC()
+	if _, ok := s.Store.conv[in.ConversationID]; !ok {
+		s.Store.conv[in.ConversationID] = domain.Conversation{ID: in.ConversationID, LeadID: in.LeadID, Channel: "ryze", Provider: "ryze", AgentEnabled: true, CreatedAt: now, UpdatedAt: now}
+	}
 	m := domain.Message{ID: hash(in.ExternalID), ConversationID: in.ConversationID, LeadID: in.LeadID, Provider: "ryze", ExternalID: in.ExternalID, Direction: "inbound", Content: in.Content, Status: "received", CreatedAt: now}
 	s.Store.msgs[in.ConversationID] = append(s.Store.msgs[in.ConversationID], m)
 	s.Store.idem["inbound:"+in.ExternalID] = m.ID
@@ -112,5 +115,14 @@ func (s *Service) Messages(cid string) []domain.Message {
 	s.Store.mu.RLock()
 	defer s.Store.mu.RUnlock()
 	return append([]domain.Message(nil), s.Store.msgs[cid]...)
+}
+func (s *Service) Conversations() []domain.Conversation {
+	s.Store.mu.RLock()
+	defer s.Store.mu.RUnlock()
+	out := make([]domain.Conversation, 0, len(s.Store.conv))
+	for _, c := range s.Store.conv {
+		out = append(out, c)
+	}
+	return out
 }
 func hash(v string) string { b := sha256.Sum256([]byte(v)); return hex.EncodeToString(b[:]) }

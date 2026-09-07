@@ -3,13 +3,25 @@ package domain
 import "time"
 
 type Conversation struct {
-	ID, LeadID, Channel, Provider  string
-	AgentEnabled, MeetingScheduled bool
-	CreatedAt, UpdatedAt           time.Time
+	ID               string    `json:"id"`
+	LeadID           string    `json:"lead_id"`
+	Channel          string    `json:"channel"`
+	Provider         string    `json:"provider"`
+	AgentEnabled     bool      `json:"agent_enabled"`
+	MeetingScheduled bool      `json:"meeting_scheduled"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 type Message struct {
-	ID, ConversationID, LeadID, Provider, ExternalID, Direction, Content, Status string
-	CreatedAt                                                                    time.Time
+	ID             string    `json:"id"`
+	ConversationID string    `json:"conversation_id"`
+	LeadID         string    `json:"lead_id"`
+	Provider       string    `json:"provider"`
+	ExternalID     string    `json:"external_id"`
+	Direction      string    `json:"direction"`
+	Content        string    `json:"content"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 type InboundMessage struct {
 	ConversationID string `json:"conversation_id"`
