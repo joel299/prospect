@@ -8,6 +8,7 @@ services:
       OMNIROUTE_BASE_URL: "https://omnirouter.iainfinito.com.br"
       OMNIROUTE_MODEL: "antigravity/gemini-3.6-flash-low"
       RYZE_BASE_URL: "https://ryzeapi.cloud"
+      RYZE_INSTANCE: "vivo1203"
       SUPABASE_URL: "https://fsdszcfkjeavuoinyjas.supabase.co"
       SUPABASE_LEADS_TABLE: "prospect_leads_google"
       BUFFER_BASE_URL: "https://api-debounce.iainfinito.com.br"
@@ -17,6 +18,7 @@ services:
       - prospect_omniroute_api_key
       - prospect_supabase_service_role_key
       - prospect_buffer_api_key
+      - prospect_ryze_api_key
     networks:
       - network_public
     deploy:
@@ -45,6 +47,9 @@ secrets:
   prospect_buffer_api_key:
     external: true
     name: prospect_buffer_api_key
+  prospect_ryze_api_key:
+    external: true
+    name: prospect_ryze_api_key
 
 networks:
   network_public:

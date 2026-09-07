@@ -9,4 +9,7 @@ fi
 if [ -r /run/secrets/prospect_buffer_api_key ]; then
   export BUFFER_API_KEY="$(cat /run/secrets/prospect_buffer_api_key)"
 fi
+if [ -r /run/secrets/prospect_ryze_api_key ]; then
+  export RYZE_API_KEY="$(cat /run/secrets/prospect_ryze_api_key)"
+fi
 exec /app/chat-api
