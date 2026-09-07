@@ -1,0 +1,8 @@
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+COPY chat-api.release /app/chat-api
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod 0555 /app/chat-api /app/docker-entrypoint.sh
+EXPOSE 8080
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

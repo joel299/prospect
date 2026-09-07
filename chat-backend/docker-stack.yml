@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  api:
+    image: prospect/chat-api:3f11988
+    environment:
+      HTTP_ADDR: ":8080"
+      OMNIROUTE_BASE_URL: "https://omnirouter.iainfinito.com.br"
+      OMNIROUTE_MODEL: "antigravity/gemini-3.6-flash-low"
+      RYZE_BASE_URL: "https://ryzeapi.cloud"
+    secrets:
+      - prospect_omniroute_api_key
+    networks:
+      - network_public
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=network_public
+        - traefik.http.routers.prospect-api-web.rule=Host(`216.22.13.46`)
+        - traefik.http.routers.prospect-api-web.entrypoints=web
+        - traefik.http.routers.prospect-api-web.middlewares=prospect-api-redirect
+        - traefik.http.routers.prospect-api-web.service=prospect-api
+        - traefik.http.routers.prospect-api-secure.rule=Host(`216.22.13.46`)
+        - traefik.http.routers.prospect-api-secure.entrypoints=websecure
+        - traefik.http.routers.prospect-api-secure.tls=true
+        - traefik.http.routers.prospect-api-secure.service=prospect-api
+        - traefik.http.middlewares.prospect-api-redirect.redirectscheme.scheme=https
+        - traefik.http.services.prospect-api.loadbalancer.server.port=8080
+
+secrets:
+  prospect_omniroute_api_key:
+    external: true
+
+networks:
+  network_public:
+    external: true
