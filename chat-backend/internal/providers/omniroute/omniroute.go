@@ -36,7 +36,12 @@ func (c Client) Generate(ctx context.Context, r domain.AgentRequest) (domain.Age
 	if len(messages) == 0 || messages[len(messages)-1]["content"] != r.User {
 		messages = append(messages, map[string]string{"role": "user", "content": r.User})
 	}
-	b, _ := json.Marshal(map[string]any{"model": c.Model, "messages": messages, "tools": r.Tools, "stream": false})
+	payload := map[string]any{"model": c.Model, "messages": messages, "tools": r.Tools, "stream": false}
+	if strings.TrimSpace(r.PromptCache) != "" {
+		// Stable, non-sensitive context is exposed separately for gateways that support prompt caching.
+		payload["prompt_cache"] = r.PromptCache
+	}
+	b, _ := json.Marshal(payload)
 	req, e := http.NewRequestWithContext(ctx, http.MethodPost, endpoint(c.BaseURL), bytes.NewReader(b))
 	if e != nil {
 		return domain.AgentResponse{}, e

@@ -19,10 +19,25 @@ import (
 var ErrDuplicate = errors.New("duplicate message")
 
 type Store struct {
-	mu   sync.RWMutex
-	conv map[string]domain.Conversation
-	msgs map[string][]domain.Message
-	idem map[string]string
+	mu     sync.RWMutex
+	conv   map[string]domain.Conversation
+	msgs   map[string][]domain.Message
+	idem   map[string]string
+	memory map[string]AgentMemory
+}
+type AgentMemory struct {
+	Summary string
+	Facts   map[string]string
+}
+type LeadContextProvider interface {
+	Get(context.Context, string) (map[string]any, string, error)
+}
+type BufferHistoryProvider interface {
+	Recent(context.Context, string, int) ([]domain.Message, error)
+}
+type AgentMemoryProvider interface {
+	Load(context.Context, string) (AgentMemory, error)
+	Save(context.Context, string, AgentMemory) error
 }
 type Service struct {
 	Store *Store
@@ -30,13 +45,22 @@ type Service struct {
 	LLM   interface {
 		Generate(context.Context, domain.AgentRequest) (domain.AgentResponse, error)
 	}
-	Tools composio.ToolExecutor
-	Hub   *realtime.Hub
+	Tools  composio.ToolExecutor
+	Hub    *realtime.Hub
+	Leads  LeadContextProvider
+	Buffer BufferHistoryProvider
+	Memory AgentMemoryProvider
 }
 
 func New(r ryze.Client, llm Generator, t composio.ToolExecutor, h *realtime.Hub) *Service {
-	return &Service{Store: &Store{conv: map[string]domain.Conversation{}, msgs: map[string][]domain.Message{}, idem: map[string]string{}}, Ryze: r, LLM: llm, Tools: t, Hub: h}
+	return &Service{Store: &Store{conv: map[string]domain.Conversation{}, msgs: map[string][]domain.Message{}, idem: map[string]string{}, memory: map[string]AgentMemory{}}, Ryze: r, LLM: llm, Tools: t, Hub: h}
 }
+
+func (s *Service) SetContextProviders(leads LeadContextProvider, buffer BufferHistoryProvider) {
+	s.Leads, s.Buffer = leads, buffer
+}
+
+func (s *Service) SetMemoryProvider(memory AgentMemoryProvider) { s.Memory = memory }
 
 // TestAgent exercises the configured LLM without sending an outbound message.
 func (s *Service) TestAgent(ctx context.Context, req domain.AgentRequest) (domain.AgentResponse, error) {
@@ -81,7 +105,40 @@ func (s *Service) respond(ctx context.Context, cid, lid string) {
 	if s.LLM == nil {
 		return
 	}
-	r, e := s.LLM.Generate(ctx, domain.AgentRequest{System: "Você é um SDR. Responda em no máximo 3 linhas, sem inventar dados.", User: history[len(history)-1].Content, History: history})
+	if len(history) == 0 {
+		return
+	}
+	current := history[len(history)-1].Content
+	lead := map[string]any{"id": lid}
+	state := "(não carregado)"
+	if s.Leads != nil {
+		if fields, leadState, err := s.Leads.Get(ctx, lid); err == nil {
+			lead = fields
+			state = leadState
+		}
+	}
+	recent := history
+	if s.Buffer != nil {
+		if buffered, err := s.Buffer.Recent(ctx, lid, 20); err == nil && len(buffered) > 0 {
+			recent = buffered
+			for i := len(buffered) - 1; i >= 0; i-- {
+				if buffered[i].Direction == "inbound" && strings.TrimSpace(buffered[i].Content) != "" {
+					current = buffered[i].Content
+					break
+				}
+			}
+		}
+	}
+	mem := AgentMemory{}
+	if s.Memory != nil {
+		mem, _ = s.Memory.Load(ctx, lid)
+	} else {
+		s.Store.mu.RLock()
+		mem = s.Store.memory[lid]
+		s.Store.mu.RUnlock()
+	}
+	prompt := BuildPromptUser(PromptContext{Lead: lead, State: state, ConversationSummary: mem.Summary, RecentMessages: recent, CurrentMessage: current})
+	r, e := s.LLM.Generate(ctx, domain.AgentRequest{System: PromptSystem, User: prompt, PromptCache: PromptSystem})
 	if e != nil || strings.TrimSpace(r.Content) == "" {
 		return
 	}
@@ -89,6 +146,31 @@ func (s *Service) respond(ctx context.Context, cid, lid string) {
 		return
 	}
 	_, _ = s.Send(ctx, domain.OutboundMessage{ConversationID: cid, LeadID: lid, Content: r.Content})
+	// Keep a bounded, provider-independent memory snapshot. Production should inject
+	// a PostgreSQL-backed AgentMemoryProvider; the map remains test/development only.
+	mem.Summary = summarize(recent)
+	if s.Memory != nil {
+		_ = s.Memory.Save(ctx, lid, mem)
+	} else {
+		s.Store.mu.Lock()
+		s.Store.memory[lid] = mem
+		s.Store.mu.Unlock()
+	}
+}
+
+func summarize(messages []domain.Message) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	start := 0
+	if len(messages) > 6 {
+		start = len(messages) - 6
+	}
+	var b strings.Builder
+	for _, m := range messages[start:] {
+		fmt.Fprintf(&b, "%s: %s\n", m.Direction, strings.TrimSpace(m.Content))
+	}
+	return strings.TrimSpace(b.String())
 }
 func (s *Service) Send(ctx context.Context, out domain.OutboundMessage) (domain.Message, error) {
 	if strings.TrimSpace(out.Content) == "" || out.ConversationID == "" || strings.TrimSpace(out.LeadID) == "" {

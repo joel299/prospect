@@ -9,3 +9,10 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (key text PRIMARY KEY, response_hash
 CREATE TABLE IF NOT EXISTS outbox_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), topic text NOT NULL, aggregate_id text NOT NULL, payload jsonb NOT NULL, published_at timestamptz, created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS messages_conversation_created_idx ON messages(conversation_id, created_at);
 CREATE INDEX IF NOT EXISTS outbox_unpublished_idx ON outbox_events(created_at) WHERE published_at IS NULL;
+CREATE TABLE IF NOT EXISTS agent_memory (
+ lead_id text PRIMARY KEY,
+ summary text NOT NULL DEFAULT '',
+ facts jsonb NOT NULL DEFAULT '{}'::jsonb,
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS agent_memory_updated_idx ON agent_memory(updated_at);

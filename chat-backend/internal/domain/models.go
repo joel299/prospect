@@ -36,8 +36,10 @@ type ToolCall struct {
 }
 type AgentRequest struct {
 	System, User string
-	History      []Message
-	Tools        []string
+	// PromptCache is stable, safe context supplied separately by the gateway when supported.
+	PromptCache string
+	History     []Message
+	Tools       []string
 }
 type AgentResponse struct {
 	Content   string     `json:"content"`

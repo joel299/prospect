@@ -2,7 +2,9 @@ package main
 
 import (
 	"github.com/iainfinito/chat-backend/internal/httpapi"
+	"github.com/iainfinito/chat-backend/internal/providers/buffer"
 	"github.com/iainfinito/chat-backend/internal/providers/composio"
+	"github.com/iainfinito/chat-backend/internal/providers/lead"
 	"github.com/iainfinito/chat-backend/internal/providers/omniroute"
 	"github.com/iainfinito/chat-backend/internal/providers/ryze"
 	"github.com/iainfinito/chat-backend/internal/realtime"
@@ -49,8 +51,14 @@ func main() {
 		Instance: envFirst("RYZE_INSTANCE", "Instance_Name"),
 		HTTP:     &http.Client{Timeout: 30 * time.Second},
 	}
-	composioClient := composio.Client{BaseURL: envFirst("COMPOSIO_BASE_URL"), APIKey: envFirst("COMPOSIO_API_KEY")}
+	composioClient := composio.Client{BaseURL: envFirst("COMPOSIO_BASE_URL"), APIKey: envFirst("COMPOSIO_API_KEY", "COMPOSIO_APIKEY")}
 	s := service.New(ryzeClient, llm, composioClient, h)
+	if historyURL := envFirst("BUFFER_HISTORY_URL"); historyURL != "" {
+		s.SetContextProviders(
+			lead.Client{URL: envFirst("LEAD_API_URL"), Token: envFirst("LEAD_API_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}},
+			buffer.HistoryClient{HistoryURL: historyURL, AccessToken: envFirst("BUFFER_ACCESS_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}},
+		)
+	}
 	addr := os.Getenv("HTTP_ADDR")
 	if addr == "" {
 		addr = ":8080"

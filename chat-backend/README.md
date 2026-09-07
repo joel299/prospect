@@ -12,6 +12,8 @@ curl http://localhost:8080/health
 
 No provider credentials are bundled. Ryze, OmniRoute, Buffer, and Composio are dependency-injected adapters and remain explicitly unconfigured until environment values and provider endpoint mappings are supplied. The API never sends secrets to OmniRoute; only conversation context is passed.
 
+The agent prompt is assembled at runtime: `lead_id`/state come from `LEAD_API_URL`, recent messages and the latest inbound message come from `BUFFER_HISTORY_URL`, and `prompt_cache` contains only stable non-secret instructions. Both URLs are full deployment-configured endpoints; the code deliberately does not guess provider paths.
+
 ## API
 
 Contract: [`docs/openapi.yaml`](docs/openapi.yaml). Endpoints include health, Ryze inbound webhook, conversation messages, outbound send, and `/ws/v1` reserved for the WebSocket edge adapter. Inbound events are deduplicated by provider external message ID and trigger an asynchronous agent response when OmniRoute is configured. Agent output is validated for non-empty content and a maximum of three lines. Tool calls are executed by Go through the Composio interface in bounded rounds.
