@@ -40,11 +40,24 @@
 - Added Trello board/list discovery, duplicate card resolution, comment write, and read-back.
 - Added Cal.com CLI operation mappings for availability and booking.
 - Added environment aliases for existing Ryze and OmniRoute names.
+- Fixed OmniRoute OpenAI response and SSE parsing in the Go client.
+
+## OmniRoute health validation — 2026-09-07
+
+- Swarm task: running on the manager node; service converged.
+- SQLite `integrity_check`: `ok`.
+- SQLite `quick_check`: `ok`.
+- Public liveness endpoint: `GET /api/health/ping` → HTTP 200.
+- Public completion probe with explicit connected provider/model → HTTP 200.
+- Probe response: `HEALTH_OK`.
+- Provider/model used for health probe: `antigravity/gemini-3.6-flash-low`.
+- Root cause of previous timeout: default `auto` route attempted unavailable/ambiguous candidates; logs showed empty pools and abandoned upstream selection. Explicit connected model responds normally.
+- API key setup intentionally not changed or recorded.
 
 ## Remaining gates
 
 - Real inbound webhook/WebSocket receipt after the recipient replies.
-- OmniRoute real provider contract and model must be exercised.
+- Configure and validate the production client API key separately.
 - PostgreSQL repository/read-back must be wired into the application runtime.
 - Cal.com real availability/booking requires the confirmed event-type payload.
 
