@@ -53,10 +53,14 @@ func main() {
 	}
 	composioClient := composio.Client{BaseURL: envFirst("COMPOSIO_BASE_URL"), APIKey: envFirst("COMPOSIO_API_KEY", "COMPOSIO_APIKEY")}
 	s := service.New(ryzeClient, llm, composioClient, h)
-	if historyURL := envFirst("BUFFER_HISTORY_URL"); historyURL != "" {
+	if envFirst("SUPABASE_URL") != "" {
+		var historyProvider service.BufferHistoryProvider
+		if historyURL := envFirst("BUFFER_HISTORY_URL"); historyURL != "" {
+			historyProvider = buffer.HistoryClient{HistoryURL: historyURL, AccessToken: envFirst("BUFFER_ACCESS_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}}
+		}
 		s.SetContextProviders(
 			lead.SupabaseClient{BaseURL: envFirst("SUPABASE_URL"), APIKey: envFirst("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_ANON_KEY"), Table: envFirst("SUPABASE_LEADS_TABLE"), HTTP: &http.Client{Timeout: 10 * time.Second}},
-			buffer.HistoryClient{HistoryURL: historyURL, AccessToken: envFirst("BUFFER_ACCESS_TOKEN"), HTTP: &http.Client{Timeout: 10 * time.Second}},
+			historyProvider,
 		)
 	}
 	addr := os.Getenv("HTTP_ADDR")

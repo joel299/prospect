@@ -2,14 +2,17 @@ version: "3.9"
 
 services:
   api:
-    image: prospect/chat-api:e2321ac2
+    image: prospect/chat-api:e56550d-supabase
     environment:
       HTTP_ADDR: ":8080"
       OMNIROUTE_BASE_URL: "https://omnirouter.iainfinito.com.br"
       OMNIROUTE_MODEL: "antigravity/gemini-3.6-flash-low"
       RYZE_BASE_URL: "https://ryzeapi.cloud"
+      SUPABASE_URL: "https://fsdszcfkjeavuoinyjas.supabase.co"
+      SUPABASE_LEADS_TABLE: "prospect_leads_google"
     secrets:
       - prospect_omniroute_api_key
+      - prospect_supabase_service_role_key
     networks:
       - network_public
     deploy:
@@ -32,6 +35,9 @@ secrets:
   prospect_omniroute_api_key:
     external: true
     name: omniroute_api_key
+  prospect_supabase_service_role_key:
+    external: true
+    name: prospect_supabase_service_role_key
 
 networks:
   network_public:
